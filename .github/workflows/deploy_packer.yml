@@ -1,0 +1,61 @@
+name: Packer Deploy
+
+on:
+  pull_request:
+   types: [closed]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+        
+    - name: Zip repository
+      run: |
+        mkdir -p dist
+        git archive --format=zip HEAD -o dist/webapp.zip
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: my-repo
+        path: dist/webapp.zip
+
+    - name: Packer Init
+      run: packer init .
+
+    - name: Configure AWS Credentials and build packer
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+          aws-access-key-id: ${{ secrets.ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.SECRET_ACCESS_KEY }}
+          aws-region: 'us-east-1'
+          
+    - name: Packer Build
+      run: |
+        packer build -var-file=variables.pkrvars.hcl ami.pkr.hcl 
+
+    - name: Set AWS Demo credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_DEMO }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_DEMO }}
+          aws-region: us-east-1
+    - name: Update launch template and refresh auto scaling group
+      run: |
+            AMI_ID=$(jq -r '.builds[-1].artifact_id' manifest.json | cut -d ":" -f2)
+            echo $AMI_ID
+            LT_ID=$(aws ec2 describe-launch-templates --launch-template-name asg_launch_template | jq '.LaunchTemplates[].LaunchTemplateId')
+            LT_ID="${LT_ID%\"}"
+            LT_ID="${LT_ID#\"}"
+            echo $LT_ID
+            aws ec2 create-launch-template-version --launch-template-name asg_launch_template --version-description WebVersion2 --source-version 1 --launch-template-data "ImageId=$AMI_ID"
+            aws autoscaling update-auto-scaling-group --auto-scaling-group-name csye6225-asg-spring2023 --launch-template LaunchTemplateId=$LT_ID,Version='$Latest'
+            aws autoscaling start-instance-refresh --auto-scaling-group-name csye6225-asg-spring2023
+    
+    - name: Clean up
+      run: |
+        rm -r dist

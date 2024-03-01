@@ -1,0 +1,14 @@
+[Unit]
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/webapp/
+ExecStart=/home/ec2-user/webapp/env/bin/python3 /home/ec2-user/webapp/main.py
+
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
