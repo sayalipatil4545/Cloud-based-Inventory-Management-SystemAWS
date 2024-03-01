@@ -1,9 +1,9 @@
 <<<<<<< HEAD
 # webapp
 # Sayali Patil
-# Assignment 6 Web API
 
-# CSYE 6225 - Spring 2023 - webapp
+
+
 ## Technology Stack 
 
 <ul><li>Backend Technology: Python
